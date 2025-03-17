@@ -6,6 +6,8 @@ import "grapesjs/dist/css/grapes.min.css"
 import gjsPresetWebpage from "grapesjs-preset-webpage"
 import gjsBlocksBasic from "grapesjs-blocks-basic"
 import "./WebBuilder.css"
+import JSZip from "jszip"
+import { saveAs } from "file-saver"
 
 interface WebBuilderProps {
   onSave?: (html: string, css: string) => void
@@ -15,6 +17,52 @@ const WebBuilder = ({ onSave }: WebBuilderProps) => {
   const editorRef = useRef<HTMLDivElement>(null)
   const editor = useRef<any>(null)
   const [editorInstance, setEditorInstance] = useState<any>(null)
+
+  // Function to export website as ZIP
+  const exportAsZip = async (html: string, css: string, assets: any[] = []) => {
+    const zip = new JSZip()
+
+    // Add HTML file
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>My Website</title>
+          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+          <link rel="stylesheet" href="styles.css">
+        </head>
+        <body>${html}</body>
+      </html>
+    `
+
+    zip.file("index.html", fullHtml)
+
+    // Add CSS file
+    zip.file("styles.css", css)
+
+    // Create assets folder
+    const assetsFolder = zip.folder("assets")
+
+    // Add assets (if any)
+    for (const asset of assets) {
+      if (asset.url && asset.filename) {
+        try {
+          const response = await fetch(asset.url)
+          const blob = await response.blob()
+          assetsFolder?.file(asset.filename, blob)
+        } catch (error) {
+          console.error(`Failed to fetch asset: ${asset.url}`, error)
+        }
+      }
+    }
+
+    // Generate and save the zip file
+    zip.generateAsync({ type: "blob" }).then((content) => {
+      saveAs(content, "my-website.zip")
+    })
+  }
 
   useEffect(() => {
     if (editorRef.current && !editor.current) {
@@ -186,42 +234,50 @@ const WebBuilder = ({ onSave }: WebBuilderProps) => {
         },
       })
 
-      // Add download command
-      editor.current.Commands.add("download-page", {
-        run: (editor: any) => {
+      // Add export as ZIP command
+      editor.current.Commands.add("export-zip", {
+        run: async (editor: any) => {
           const html = editor.getHtml()
           const css = editor.getCss()
 
-          // Create a complete HTML document
-          const fullHtml = `
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>My Website</title>
-                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-                <style>${css}</style>
-              </head>
-              <body>${html}</body>
-            </html>
-          `
+          // Get all assets (images, etc.)
+          const assets = []
+          const components = editor.Components.getComponents()
 
-          // Create a Blob with the HTML content
-          const blob = new Blob([fullHtml], { type: "text/html" })
+          // Function to recursively extract assets from components
+          const extractAssets = (components: any[]) => {
+            components.forEach((component) => {
+              // Check for images
+              if (component.get("type") === "image") {
+                const src = component.get("src")
+                if (src && !src.startsWith("data:")) {
+                  const filename = src.split("/").pop()
+                  assets.push({ url: src, filename })
+                }
+              }
 
-          // Create a download link
-          const link = document.createElement("a")
-          link.href = URL.createObjectURL(blob)
-          link.download = "my-website.html"
+              // Check for background images in styles
+              const style = component.getStyle()
+              if (style && style["background-image"]) {
+                const bgImage = style["background-image"]
+                const urlMatch = bgImage.match(/url$$['"]?([^'"]+)['"]?$$/)
+                if (urlMatch && urlMatch[1] && !urlMatch[1].startsWith("data:")) {
+                  const filename = urlMatch[1].split("/").pop()
+                  assets.push({ url: urlMatch[1], filename })
+                }
+              }
 
-          // Trigger the download
-          document.body.appendChild(link)
-          link.click()
+              // Process child components
+              if (component.get("components")) {
+                extractAssets(component.get("components").models)
+              }
+            })
+          }
 
-          // Clean up
-          document.body.removeChild(link)
-          URL.revokeObjectURL(link.href)
+          extractAssets(components.models)
+
+          // Export as ZIP
+          await exportAsZip(html, css, assets)
         },
       })
 
@@ -236,17 +292,17 @@ const WebBuilder = ({ onSave }: WebBuilderProps) => {
     }
   }, [onSave])
 
-  const handleDownload = () => {
+  const handleExportZip = () => {
     if (editorInstance) {
-      editorInstance.runCommand("download-page")
+      editorInstance.runCommand("export-zip")
     }
   }
 
   return (
     <div className="web-builder">
       <div className="custom-controls">
-        <button className="download-btn" onClick={handleDownload}>
-          Download Website
+        <button className="download-btn" onClick={handleExportZip}>
+          Download as ZIP
         </button>
       </div>
       <div ref={editorRef} className="editor-container"></div>
