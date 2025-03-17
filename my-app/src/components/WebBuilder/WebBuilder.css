@@ -3,43 +3,44 @@
   width: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .editor-container {
   flex: 1;
 }
 
-/* Custom panel styling */
-.panel__devices,
-.panel__switcher,
-.panel__basic-actions {
+/* Custom controls */
+.custom-controls {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
   display: flex;
-  justify-content: center;
-  padding: 5px;
-  background-color: #444;
+  gap: 10px;
 }
 
-.panel__devices button,
-.panel__switcher button,
-.panel__basic-actions button {
-  margin: 0 5px;
-  padding: 5px 10px;
-  border-radius: 3px;
-  background-color: #555;
+.download-btn {
+  background-color: #4caf50;
   color: white;
   border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
   cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.panel__devices button:hover,
-.panel__switcher button:hover,
-.panel__basic-actions button:hover {
-  background-color: #666;
+.download-btn:hover {
+  background-color: #45a049;
 }
 
-.panel__devices button.active,
-.panel__switcher button.active {
-  background-color: #777;
+.download-btn::before {
+  content: "↓";
+  font-size: 16px;
 }
 
 /* Override some GrapeJS styles for better integration with Tailwind */

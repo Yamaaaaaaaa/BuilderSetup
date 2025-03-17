@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react"
+"use client"
+
+import { useEffect, useRef, useState } from "react"
 import grapesjs from "grapesjs"
 import "grapesjs/dist/css/grapes.min.css"
 import gjsPresetWebpage from "grapesjs-preset-webpage"
 import gjsBlocksBasic from "grapesjs-blocks-basic"
 import "./WebBuilder.css"
-
 
 interface WebBuilderProps {
   onSave?: (html: string, css: string) => void
@@ -13,6 +14,7 @@ interface WebBuilderProps {
 const WebBuilder = ({ onSave }: WebBuilderProps) => {
   const editorRef = useRef<HTMLDivElement>(null)
   const editor = useRef<any>(null)
+  const [editorInstance, setEditorInstance] = useState<any>(null)
 
   useEffect(() => {
     if (editorRef.current && !editor.current) {
@@ -127,6 +129,18 @@ const WebBuilder = ({ onSave }: WebBuilderProps) => {
                   className: "btn-preview",
                   command: "preview",
                 },
+                {
+                  id: "download-btn",
+                  label: "Download",
+                  className: "btn-download",
+                  command: "download-page",
+                },
+                {
+                  id: "export-zip-btn",
+                  label: "Export ZIP",
+                  className: "btn-export-zip",
+                  command: "export-zip",
+                },
               ],
             },
           ],
@@ -171,6 +185,47 @@ const WebBuilder = ({ onSave }: WebBuilderProps) => {
           }
         },
       })
+
+      // Add download command
+      editor.current.Commands.add("download-page", {
+        run: (editor: any) => {
+          const html = editor.getHtml()
+          const css = editor.getCss()
+
+          // Create a complete HTML document
+          const fullHtml = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>My Website</title>
+                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                <style>${css}</style>
+              </head>
+              <body>${html}</body>
+            </html>
+          `
+
+          // Create a Blob with the HTML content
+          const blob = new Blob([fullHtml], { type: "text/html" })
+
+          // Create a download link
+          const link = document.createElement("a")
+          link.href = URL.createObjectURL(blob)
+          link.download = "my-website.html"
+
+          // Trigger the download
+          document.body.appendChild(link)
+          link.click()
+
+          // Clean up
+          document.body.removeChild(link)
+          URL.revokeObjectURL(link.href)
+        },
+      })
+
+      setEditorInstance(editor.current)
     }
 
     return () => {
@@ -181,11 +236,19 @@ const WebBuilder = ({ onSave }: WebBuilderProps) => {
     }
   }, [onSave])
 
+  const handleDownload = () => {
+    if (editorInstance) {
+      editorInstance.runCommand("download-page")
+    }
+  }
+
   return (
     <div className="web-builder">
-      <div className="panel__devices"></div>
-      <div className="panel__switcher"></div>
-      <div className="panel__basic-actions"></div>
+      <div className="custom-controls">
+        <button className="download-btn" onClick={handleDownload}>
+          Download Website
+        </button>
+      </div>
       <div ref={editorRef} className="editor-container"></div>
     </div>
   )
